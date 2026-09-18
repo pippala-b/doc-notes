@@ -1,32 +1,42 @@
-const CONFIDENCE = [
-  { value: 1, label: "Shaky", hint: "again tomorrow" },
-  { value: 2, label: "Okay", hint: "in a few days" },
-  { value: 3, label: "Solid", hint: "much later" },
-] as const;
+import { nextIntervalDays } from "@/lib/review";
+import { CONFIDENCE, type ConfidenceValue } from "./Confidence";
 
-// Rating a note schedules its next review (see src/lib/review.ts).
+const VALUES: ConfidenceValue[] = [1, 2, 3];
+
+// Rating a note schedules its next review (see src/lib/review.ts), so each
+// button says when the note comes back.
 export default function RatingBar({
   current,
+  intervalDays,
   onRate,
+  disabled,
 }: {
-  current: 1 | 2 | 3 | null;
-  onRate: (confidence: 1 | 2 | 3) => void;
+  current: ConfidenceValue | null;
+  intervalDays: number;
+  onRate: (confidence: ConfidenceValue) => void;
+  disabled?: boolean;
 }) {
   return (
-    <div className="flex gap-2">
-      {CONFIDENCE.map((c) => (
-        <button
-          key={c.value}
-          type="button"
-          onClick={() => onRate(c.value)}
-          className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
-            current === c.value ? "border-accent font-semibold text-accent" : "border-line"
-          }`}
-        >
-          {c.label}
-          <span className="block text-xs font-normal text-ink-2">{c.hint}</span>
-        </button>
-      ))}
+    <div className="grid grid-cols-3 gap-2">
+      {VALUES.map((value) => {
+        const days = nextIntervalDays(intervalDays, value);
+        const selected = current === value;
+        return (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={selected}
+            disabled={disabled}
+            onClick={() => onRate(value)}
+            className={`flex min-h-14 flex-col items-center justify-center rounded-xl text-[0.95rem] disabled:opacity-50 ${
+              selected ? "border-2 border-ink bg-background font-semibold" : `border-[1.5px] font-medium ${CONFIDENCE[value].border}`
+            }`}
+          >
+            {CONFIDENCE[value].label}
+            <span className="text-xs font-normal text-ink-2">{days === 1 ? "tomorrow" : `in ${days} days`}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }

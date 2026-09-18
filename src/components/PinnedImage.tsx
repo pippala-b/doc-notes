@@ -47,8 +47,8 @@ export default function PinnedImage({
               setSelected(p.id === selected ? null : p.id);
             }}
             style={{ left: `${p.x * 100}%`, top: `${p.y * 100}%` }}
-            className={`absolute flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-xs font-semibold text-white shadow ${
-              p.id === selected ? "bg-accent ring-2 ring-accent/40" : "bg-black/70"
+            className={`absolute flex h-7 w-7 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white text-xs font-semibold shadow ${
+              p.id === selected ? "bg-accent text-on-accent ring-2 ring-accent/40" : "bg-black/70 text-white"
             }`}
           >
             {i + 1}
@@ -66,7 +66,7 @@ export default function PinnedImage({
             onChange={(e) =>
               onChange?.(pins.map((p) => (p.id === current.id ? { ...p, text: e.target.value } : p)))
             }
-            className="min-h-16 flex-1 rounded-lg border border-line bg-surface p-2 text-sm"
+            className="field min-h-16 flex-1 text-sm"
           />
           {editable && (
             <button
@@ -75,7 +75,7 @@ export default function PinnedImage({
                 onChange(pins.filter((p) => p.id !== current.id));
                 setSelected(null);
               }}
-              className="rounded-lg border border-line px-3 py-2 text-sm text-ink-2"
+              className="min-h-11 rounded-xl border border-line-strong px-3 text-sm"
             >
               Remove
             </button>
