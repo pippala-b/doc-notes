@@ -4,9 +4,11 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const LINKS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/topics", label: "Study Tree" },
+  { href: "/", label: "Home" },
+  { href: "/topics", label: "Tree" },
   { href: "/capture", label: "Capture" },
+  { href: "/review", label: "Review" },
+  { href: "/search", label: "Search" },
 ];
 
 // Top bar on desktop, bottom tab bar on phones (thumb reach; mirrors the eventual iOS app).
@@ -22,7 +24,7 @@ export default function Nav() {
             <Link
               key={l.href}
               href={l.href}
-              className={`flex-1 rounded-lg px-3 py-3 text-center text-sm sm:flex-none ${
+              className={`flex-1 rounded-lg px-2 py-3 text-center text-sm sm:flex-none sm:px-3 ${
                 active ? "font-semibold text-accent" : "text-ink-2"
               }`}
             >

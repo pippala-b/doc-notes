@@ -1,33 +1,37 @@
 "use client";
 
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import NoteEditor, { type NoteEdits } from "@/components/NoteEditor";
 import NoteView from "@/components/NoteView";
 import PinnedImage from "@/components/PinnedImage";
+import RatingBar from "@/components/RatingBar";
 import { api } from "@/lib/api";
 import { categoryOf, findTopic } from "@/lib/topics";
 import type { NoteDetail, Pin } from "@/lib/types";
-
-const CONFIDENCE = [
-  { value: 1, label: "Shaky" },
-  { value: 2, label: "Okay" },
-  { value: 3, label: "Solid" },
-] as const;
 
 export default function NotePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [note, setNote] = useState<NoteDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [enhancing, setEnhancing] = useState(false);
+  const [nextReview, setNextReview] = useState<number | null>(null);
   const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
+  const load = useCallback(
+    () =>
+      api<{ note: NoteDetail }>(`/api/notes/${id}`)
+        .then((r) => setNote(r.note))
+        .catch((e) => setError(e.message)),
+    [id],
+  );
   useEffect(() => {
-    api<{ note: NoteDetail }>(`/api/notes/${id}`)
-      .then((r) => setNote(r.note))
-      .catch((e) => setError(e.message));
-  }, [id]);
+    load();
+  }, [load]);
 
-  if (error) return <p className="card p-4 text-sm">{error}</p>;
+  if (!note && error) return <p className="card p-4 text-sm">{error}</p>;
   if (!note) return <p className="text-sm text-ink-2">Loading…</p>;
 
   function updatePins(imageId: string, pins: Pin[]) {
@@ -46,7 +50,34 @@ export default function NotePage() {
 
   async function rate(confidence: 1 | 2 | 3) {
     setNote((n) => n && { ...n, confidence, reviewedAt: new Date().toISOString() });
-    await api(`/api/notes/${id}`, { method: "PATCH", body: JSON.stringify({ confidence, reviewed: true }) });
+    const r = await api<{ nextReviewInDays: number }>(`/api/notes/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ confidence }),
+    });
+    setNextReview(r.nextReviewInDays);
+  }
+
+  async function saveEdits(edits: NoteEdits, topicId: string) {
+    try {
+      await api(`/api/notes/${id}`, { method: "PATCH", body: JSON.stringify({ edits, topicId }) });
+      await load();
+      setEditing(false);
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
+
+  async function enhance() {
+    setEnhancing(true);
+    setError(null);
+    try {
+      await api(`/api/notes/${id}/enhance`, { method: "POST" });
+      await load();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setEnhancing(false);
+    }
   }
 
   async function remove() {
@@ -77,7 +108,29 @@ export default function NotePage() {
         </p>
       </header>
 
-      <NoteView note={note.enhanced} />
+      <div className="flex flex-wrap gap-2">
+        <button type="button" onClick={() => setEditing(!editing)} className="rounded-lg border border-line px-3 py-1.5 text-sm">
+          {editing ? "Close editor" : "Edit"}
+        </button>
+        {!note.aiEnhanced && (
+          <button
+            type="button"
+            onClick={enhance}
+            disabled={enhancing}
+            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:text-black"
+          >
+            {enhancing ? "Enhancing… (can take a minute)" : "Enhance with AI"}
+          </button>
+        )}
+      </div>
+
+      {error && <p className="card border-red-400 p-3 text-sm">{error}</p>}
+
+      {editing ? (
+        <NoteEditor note={note.enhanced} topicId={note.topicId} onSave={saveEdits} onCancel={() => setEditing(false)} />
+      ) : (
+        <NoteView note={note.enhanced} />
+      )}
 
       {note.images.length > 0 && (
         <section className="card flex flex-col gap-4 p-4">
@@ -102,20 +155,12 @@ export default function NotePage() {
 
       <section className="card p-4">
         <h2 className="mb-2 text-sm font-semibold tracking-wide text-ink-2 uppercase">How well do you know this?</h2>
-        <div className="flex gap-2">
-          {CONFIDENCE.map((c) => (
-            <button
-              key={c.value}
-              type="button"
-              onClick={() => rate(c.value)}
-              className={`flex-1 rounded-lg border px-3 py-2 text-sm ${
-                note.confidence === c.value ? "border-accent font-semibold text-accent" : "border-line"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
+        <RatingBar current={note.confidence} onRate={rate} />
+        {nextReview !== null && (
+          <p className="mt-2 text-xs text-ink-2">
+            Next review in {nextReview} day{nextReview === 1 ? "" : "s"}.
+          </p>
+        )}
       </section>
 
       <button type="button" onClick={remove} className="self-start text-sm text-ink-2 underline">

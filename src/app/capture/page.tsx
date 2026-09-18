@@ -5,8 +5,9 @@ import { useState } from "react";
 import NoteView from "@/components/NoteView";
 import { api } from "@/lib/api";
 import { prepareImage } from "@/lib/image";
-import type { EnhancedNote } from "@/lib/schema";
-import { CATEGORIES, UNFILED_TOPIC_ID, findTopic } from "@/lib/topics";
+import TopicSelect from "@/components/TopicSelect";
+import { manualNote, type EnhancedNote } from "@/lib/schema";
+import { UNFILED_TOPIC_ID, findTopic } from "@/lib/topics";
 
 type Prepared = Awaited<ReturnType<typeof prepareImage>>;
 
@@ -15,6 +16,7 @@ export default function Capture() {
   const [images, setImages] = useState<Prepared[]>([]);
   const [url, setUrl] = useState("");
   const [text, setText] = useState("");
+  const [title, setTitle] = useState("");
   const [busy, setBusy] = useState<"enhance" | "save" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [draft, setDraft] = useState<EnhancedNote | null>(null);
@@ -47,8 +49,11 @@ export default function Capture() {
     }
   }
 
+  // With a draft: save the AI note. Without: save the capture as-is (can be enhanced later).
   async function save() {
-    if (!draft) return;
+    const enhanced = draft
+      ? { ...draft, topicId }
+      : manualNote(title.trim() || text.trim().split("\n")[0].slice(0, 70) || "Untitled note", text, topicId);
     setBusy("save");
     setError(null);
     try {
@@ -58,7 +63,8 @@ export default function Capture() {
           sourceText: text || undefined,
           sourceUrl: url || undefined,
           topicId,
-          enhanced: { ...draft, topicId },
+          enhanced,
+          aiEnhanced: !!draft,
           images: images.map(({ mediaType, data }) => ({ mediaType, data })),
         }),
       });
@@ -135,6 +141,29 @@ export default function Capture() {
           >
             {busy === "enhance" ? "Building study note… (can take a minute)" : "Enhance with AI"}
           </button>
+
+          <section className="card flex flex-col gap-3 p-4">
+            <h2 className="text-sm font-medium">Or save as-is</h2>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Title (defaults to the first line of your notes)"
+              className="rounded-lg border border-line bg-transparent px-3 py-2"
+            />
+            <label className="text-sm text-ink-2">
+              Filed under
+              <TopicSelect value={topicId} onChange={setTopicId} />
+            </label>
+            <button
+              type="button"
+              disabled={!hasInput || busy !== null}
+              onClick={save}
+              className="rounded-lg border border-line px-4 py-3 font-medium disabled:opacity-50"
+            >
+              {busy === "save" ? "Saving…" : "Save without AI"}
+            </button>
+            <p className="text-xs text-ink-2">You can run the AI enhancement later from the note.</p>
+          </section>
         </>
       )}
 
@@ -146,22 +175,7 @@ export default function Capture() {
             <h2 className="text-xl font-semibold">{draft.title}</h2>
             <label className="text-sm text-ink-2">
               Filed under
-              <select
-                value={topicId}
-                onChange={(e) => setTopicId(e.target.value)}
-                className="mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-ink"
-              >
-                <option value={UNFILED_TOPIC_ID}>Unfiled</option>
-                {CATEGORIES.map((c) => (
-                  <optgroup key={c.id} label={c.name}>
-                    {c.topics.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+              <TopicSelect value={topicId} onChange={setTopicId} />
             </label>
           </section>
 

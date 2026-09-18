@@ -1,4 +1,6 @@
 import { query } from "@/lib/db";
+import { SUMMARY_COLUMNS } from "@/lib/noteSql";
+import { nextIntervalDays } from "@/lib/review";
 import { UpdateNoteSchema, type NoteDetail, type NoteImageMeta } from "@/lib/types";
 
 export async function GET(_request: Request, ctx: RouteContext<"/api/notes/[id]">) {
@@ -6,10 +8,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/notes/[id]"
   if (!Number.isInteger(id)) return Response.json({ error: "Bad id" }, { status: 400 });
 
   const [note] = await query<Omit<NoteDetail, "images">>(
-    `SELECT id::int AS "id", created_at AS "createdAt", topic_id AS "topicId",
-            source_kind AS "sourceKind", enhanced->>'title' AS "title",
-            enhanced->>'summary' AS "summary", confidence AS "confidence",
-            reviewed_at AS "reviewedAt", source_text AS "sourceText",
+    `SELECT ${SUMMARY_COLUMNS}, source_text AS "sourceText",
             source_url AS "sourceUrl", enhanced AS "enhanced"
        FROM notes WHERE id = $1`,
     [id],
@@ -30,16 +29,36 @@ export async function PATCH(request: Request, ctx: RouteContext<"/api/notes/[id]
   if (!Number.isInteger(id) || !parsed.success) {
     return Response.json({ error: "Invalid update" }, { status: 400 });
   }
-  const { topicId, confidence, reviewed } = parsed.data;
-  await query(
-    `UPDATE notes SET
-        topic_id    = COALESCE($2, topic_id),
-        confidence  = COALESCE($3, confidence),
-        reviewed_at = CASE WHEN $4 THEN now() ELSE reviewed_at END,
-        updated_at  = now()
-      WHERE id = $1`,
-    [id, topicId ?? null, confidence ?? null, reviewed ?? false],
-  );
+  const { topicId, confidence, edits } = parsed.data;
+
+  if (topicId || edits) {
+    // Keep the topic id inside the note JSON in step with the column.
+    const patch = { ...edits, ...(topicId ? { topicId } : {}) };
+    await query(
+      `UPDATE notes SET topic_id = COALESCE($2, topic_id),
+                        enhanced = enhanced || $3::jsonb,
+                        updated_at = now()
+        WHERE id = $1`,
+      [id, topicId ?? null, JSON.stringify(patch)],
+    );
+  }
+
+  if (confidence) {
+    const [row] = await query<{ interval_days: number }>(
+      `SELECT interval_days FROM notes WHERE id = $1`,
+      [id],
+    );
+    if (!row) return Response.json({ error: "Not found" }, { status: 404 });
+    const days = nextIntervalDays(row.interval_days, confidence);
+    await query(
+      `UPDATE notes SET confidence = $2, interval_days = $3,
+                        due_at = now() + make_interval(days => $3),
+                        reviewed_at = now(), review_count = review_count + 1
+        WHERE id = $1`,
+      [id, confidence, days],
+    );
+    return Response.json({ ok: true, nextReviewInDays: days });
+  }
   return Response.json({ ok: true });
 }
 

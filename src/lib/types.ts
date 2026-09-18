@@ -20,6 +20,9 @@ export type NoteSummary = {
   summary: string;
   confidence: 1 | 2 | 3 | null;
   reviewedAt: string | null;
+  dueAt: string;
+  aiEnhanced: boolean;
+  snippet?: string; // search only; matches wrapped in [[ ]]
 };
 
 export type NoteDetail = NoteSummary & {
@@ -39,11 +42,22 @@ export const CreateNoteSchema = z.object({
   sourceUrl: z.string().url().optional(),
   topicId: z.string(),
   enhanced: EnhancedNoteSchema,
+  aiEnhanced: z.boolean().default(true),
   images: z.array(ImageUpload).max(6).default([]),
 });
 
 export const UpdateNoteSchema = z.object({
   topicId: z.string().optional(),
+  // Rating a note also schedules its next review.
   confidence: z.union([z.literal(1), z.literal(2), z.literal(3)]).optional(),
-  reviewed: z.boolean().optional(),
+  // Hand edits, merged into the stored note.
+  edits: EnhancedNoteSchema.pick({
+    title: true,
+    summary: true,
+    enhancedMarkdown: true,
+    highYield: true,
+    pitfalls: true,
+  })
+    .partial()
+    .optional(),
 });

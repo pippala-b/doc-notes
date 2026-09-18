@@ -20,11 +20,18 @@ function Stat({ label, value, sub }: { label: string; value: string; sub?: strin
 
 export default function Dashboard() {
   const [notes, setNotes] = useState<NoteSummary[] | null>(null);
+  const [dueCount, setDueCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    api<{ notes: NoteSummary[] }>("/api/notes")
-      .then((r) => setNotes(r.notes))
+    Promise.all([
+      api<{ notes: NoteSummary[] }>("/api/notes"),
+      api<{ notes: NoteSummary[] }>("/api/notes?due=1"), // "due" is decided by the database clock
+    ])
+      .then(([all, due]) => {
+        setNotes(all.notes);
+        setDueCount(due.notes.length);
+      })
       .catch((e) => setError(e.message));
   }, []);
 
@@ -32,7 +39,6 @@ export default function Dashboard() {
   if (!notes) return <p className="text-sm text-ink-2">Loading…</p>;
 
   const covered = new Set(notes.map((n) => n.topicId).filter((id) => findTopic(id)));
-  const shaky = notes.filter((n) => n.confidence === 1 || !n.reviewedAt);
   const coverage = CATEGORIES.map((c) => {
     const done = c.topics.filter((t) => covered.has(t.id)).length;
     return {
@@ -54,7 +60,9 @@ export default function Dashboard() {
       <div className="grid grid-cols-3 gap-3">
         <Stat label="Notes" value={String(notes.length)} />
         <Stat label="Topics covered" value={`${covered.size}`} sub={`of ${ALL_TOPICS.length}`} />
-        <Stat label="To review" value={String(shaky.length)} sub="unreviewed or shaky" />
+        <Link href="/review">
+          <Stat label="Due for review" value={String(dueCount)} sub="tap to start" />
+        </Link>
       </div>
 
       <section className="card p-4">

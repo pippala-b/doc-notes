@@ -27,3 +27,21 @@ CREATE TABLE IF NOT EXISTS note_images (
 );
 
 CREATE INDEX IF NOT EXISTS note_images_note_idx ON note_images (note_id, position);
+
+-- v2: manual notes, spaced review, full-text search
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS ai_enhanced   BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS due_at        TIMESTAMPTZ NOT NULL DEFAULT now();
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS interval_days INT NOT NULL DEFAULT 0;
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS review_count  INT NOT NULL DEFAULT 0;
+
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS search TSVECTOR GENERATED ALWAYS AS (
+  setweight(to_tsvector('english', coalesce(enhanced->>'title', '')), 'A') ||
+  setweight(to_tsvector('english', coalesce(enhanced->>'summary', '') || ' ' ||
+                                   coalesce(enhanced->>'highYield', '')), 'B') ||
+  setweight(to_tsvector('english', coalesce(enhanced->>'enhancedMarkdown', '') || ' ' ||
+                                   coalesce(enhanced->>'pitfalls', '') || ' ' ||
+                                   coalesce(source_text, '')), 'C')
+) STORED;
+
+CREATE INDEX IF NOT EXISTS notes_search_idx ON notes USING GIN (search);
+CREATE INDEX IF NOT EXISTS notes_due_idx ON notes (due_at);

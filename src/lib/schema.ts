@@ -65,3 +65,21 @@ export const EnhanceRequestSchema = z.object({
 });
 
 export type EnhanceRequest = z.infer<typeof EnhanceRequestSchema>;
+
+// A note saved without AI: the resident's own text is the note body.
+export function manualNote(title: string, text: string, topicId: string): EnhancedNote {
+  return {
+    title,
+    topicId,
+    relatedTopicIds: [],
+    summary: "",
+    enhancedMarkdown: text,
+    highYield: [],
+    pitfalls: [],
+    mnemonics: [],
+    quiz: [],
+    mermaid: "",
+    chart: null,
+    uncertain: [],
+  };
+}

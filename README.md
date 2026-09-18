@@ -11,7 +11,10 @@ Status: local-only web experiment. The layout is phone-first (bottom tab bar, ca
 - **Study tree** – 31 categories / ~150 leaf topics (`src/lib/topics.ts`), with note counts and a filter.
 - **Dashboard** – note count, topic coverage by category, review queue.
 - **Interactive image notes** – tap a source photo to drop numbered pins with notes.
-- **Self-rated confidence** – Shaky / Okay / Solid per note.
+- **Save without AI** – store a capture as-is and run "Enhance with AI" later from the note.
+- **Edit** – title, topic, summary, note body (markdown), high-yield facts, and pitfalls.
+- **Search** – Postgres full-text search across titles, summaries, high-yield facts, note text, and original notes, ranked with highlighted snippets.
+- **Review queue** – spaced repetition: new notes are due immediately; rating a note Shaky / Okay / Solid reschedules it (1 day / ×1.5 / ×2.5, see `src/lib/review.ts`). Review cards show the self-test questions first, then the note.
 
 ## Stack
 
@@ -41,7 +44,8 @@ AI-generated content can be wrong. Treat every note as a draft to check against 
 db/schema.sql               tables: notes, note_images
 src/lib/topics.ts           ABSITE study tree
 src/lib/schema.ts           Zod schema for the enhanced note (shared by API + UI)
-src/app/api/enhance         Claude call
+src/lib/enhance.ts          Claude call (used by /api/enhance and /api/notes/[id]/enhance)
+src/lib/review.ts           review interval schedule
 src/app/api/notes, images   CRUD + image bytes + pins
-src/app/{page,topics,capture,notes/[id]}   UI
+src/app/{page,topics,capture,review,search,notes/[id]}   UI
 ```
