@@ -18,6 +18,7 @@ export default function Nav() {
   const pathname = usePathname();
   const isActive = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
   const focused = pathname.startsWith("/review") || pathname.startsWith("/notes/");
+  if (pathname === "/login") return null;
 
   return (
     <>
