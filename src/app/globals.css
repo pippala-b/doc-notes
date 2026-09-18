@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  --background: #f6f6f4;
+  --surface-1: #fcfcfb;
+  --border: #e3e2dd;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --accent: #1f5fb0;
+  --series-1: #2a78d6;
+  --track: #ecebe6;
+  --warn-bg: #fdf3d7;
+  --warn-text: #6b4a00;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --background: #111110;
+    --surface-1: #1a1a19;
+    --border: #2f2f2c;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --accent: #7db3f5;
+    --series-1: #3987e5;
+    --track: #262624;
+    --warn-bg: #3a2f10;
+    --warn-text: #f3d98a;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface-1);
+  --color-line: var(--border);
+  --color-ink: var(--text-primary);
+  --color-ink-2: var(--text-secondary);
+  --color-accent: var(--accent);
+  --color-series: var(--series-1);
+  --color-track: var(--track);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--text-primary);
+}
+
+.card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+/* Rendered markdown (enhanced notes) */
+.prose-note { line-height: 1.6; }
+.prose-note h1, .prose-note h2, .prose-note h3 { font-weight: 650; margin: 1.2em 0 0.4em; line-height: 1.25; }
+.prose-note h1 { font-size: 1.3rem; }
+.prose-note h2 { font-size: 1.15rem; }
+.prose-note h3 { font-size: 1rem; }
+.prose-note p, .prose-note ul, .prose-note ol { margin: 0.5em 0; }
+.prose-note ul { list-style: disc; padding-left: 1.3em; }
+.prose-note ol { list-style: decimal; padding-left: 1.3em; }
+.prose-note table { display: block; overflow-x: auto; border-collapse: collapse; margin: 0.8em 0; font-size: 0.92em; }
+.prose-note th, .prose-note td { border: 1px solid var(--border); padding: 6px 10px; text-align: left; vertical-align: top; }
+.prose-note th { background: var(--track); }
+.prose-note code { font-family: var(--font-geist-mono); font-size: 0.9em; background: var(--track); padding: 1px 4px; border-radius: 4px; }
+.prose-note blockquote { border-left: 3px solid var(--border); padding-left: 12px; color: var(--text-secondary); }
