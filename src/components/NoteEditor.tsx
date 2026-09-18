@@ -27,10 +27,10 @@ export default function NoteEditor({
   const [pitfalls, setPitfalls] = useState(note.pitfalls.join("\n"));
   const [saving, setSaving] = useState(false);
 
-  const field = "mt-1 block w-full rounded-lg border border-line bg-surface px-3 py-2 text-ink";
+  const field = "field mt-1.5 block font-normal";
   return (
     <form
-      className="card flex flex-col gap-3 p-4 text-sm text-ink-2"
+      className="flex flex-col gap-4 text-sm font-semibold"
       onSubmit={async (e) => {
         e.preventDefault();
         setSaving(true);
@@ -53,7 +53,9 @@ export default function NoteEditor({
       </label>
       <label>
         Filed under
-        <TopicSelect value={topic} onChange={setTopic} />
+        <span className="mt-1.5 block font-normal">
+          <TopicSelect value={topic} onChange={setTopic} />
+        </span>
       </label>
       <label>
         Summary
@@ -77,13 +79,13 @@ export default function NoteEditor({
         <textarea value={pitfalls} onChange={(e) => setPitfalls(e.target.value)} rows={3} className={field} />
       </label>
       <div className="flex gap-3">
-        <button type="button" onClick={onCancel} className="flex-1 rounded-lg border border-line px-4 py-2.5 text-ink">
+        <button type="button" onClick={onCancel} className="btn btn-outline flex-1">
           Cancel
         </button>
         <button
           type="submit"
           disabled={saving}
-          className="flex-1 rounded-lg bg-accent px-4 py-2.5 font-medium text-white disabled:opacity-50 dark:text-black"
+          className="btn btn-primary flex-1"
         >
           {saving ? "Saving…" : "Save changes"}
         </button>

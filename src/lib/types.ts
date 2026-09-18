@@ -21,6 +21,7 @@ export type NoteSummary = {
   confidence: 1 | 2 | 3 | null;
   reviewedAt: string | null;
   dueAt: string;
+  intervalDays: number;
   aiEnhanced: boolean;
   snippet?: string; // search only; matches wrapped in [[ ]]
 };

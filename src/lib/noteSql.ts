@@ -9,4 +9,5 @@ export const SUMMARY_COLUMNS = `
   confidence           AS "confidence",
   reviewed_at          AS "reviewedAt",
   due_at               AS "dueAt",
+  interval_days        AS "intervalDays",
   ai_enhanced          AS "aiEnhanced"`;

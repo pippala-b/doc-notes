@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { CameraIcon, CloseIcon, LockIcon } from "@/components/icons";
 import NoteView from "@/components/NoteView";
 import { api } from "@/lib/api";
 import { prepareImage } from "@/lib/image";
@@ -41,7 +42,8 @@ export default function Capture() {
         }),
       });
       setDraft(note);
-      setTopicId(findTopic(note.topicId) ? note.topicId : UNFILED_TOPIC_ID);
+      // A topic picked before enhancing wins over the model's choice.
+      setTopicId((picked) => (findTopic(picked) ? picked : findTopic(note.topicId) ? note.topicId : UNFILED_TOPIC_ID));
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -78,124 +80,144 @@ export default function Capture() {
   const hasInput = images.length > 0 || url.trim() || text.trim();
 
   return (
-    <div className="flex flex-col gap-4">
-      <h1 className="text-2xl font-semibold">Capture</h1>
+    <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <header className="flex flex-col gap-1.5">
+        <h1 className="display">Capture</h1>
+        {!draft && <p className="text-[0.95rem] text-ink-2">A photo, a link, or a few typed lines. Any one is enough.</p>}
+      </header>
 
       {!draft && (
         <>
-          <section className="card flex flex-col gap-3 p-4">
-            <label className="text-sm font-medium">Photos</label>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={(e) => addFiles(e.target.files)}
-              className="text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-track file:px-3 file:py-2"
-            />
+          <section className="flex flex-col gap-3">
+            <label className="flex min-h-33 cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-[1.5px] border-dashed border-ink-2 bg-surface px-4 text-center focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-accent">
+              <CameraIcon size={28} />
+              <span className="font-semibold">Take a photo or choose from library</span>
+              <span className="text-[0.8rem] text-ink-2">Slides, whiteboards, textbook pages · up to 6</span>
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                disabled={images.length >= 6}
+                onChange={(e) => addFiles(e.target.files)}
+                className="sr-only"
+              />
+            </label>
             {images.length > 0 && (
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-3 pt-1">
                 {images.map((img, i) => (
-                  <button
-                    key={i}
-                    type="button"
-                    title="Remove"
-                    onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
-                    className="relative"
-                  >
+                  <div key={i} className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.previewUrl} alt="" className="h-20 w-20 rounded-lg border border-line object-cover" />
-                    <span className="absolute -top-1.5 -right-1.5 rounded-full bg-black/70 px-1.5 text-xs text-white">×</span>
-                  </button>
+                    <img src={img.previewUrl} alt={`Photo ${i + 1}`} className="h-18 w-18 rounded-[10px] object-cover" />
+                    <button
+                      type="button"
+                      aria-label={`Remove photo ${i + 1}`}
+                      onClick={() => setImages((prev) => prev.filter((_, j) => j !== i))}
+                      className="absolute -top-3 -right-3 flex h-8 w-8 items-center justify-center rounded-full border-2 border-background bg-ink text-background"
+                    >
+                      <CloseIcon size={12} strokeWidth={3} />
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
+          </section>
 
-            <label className="mt-2 text-sm font-medium">Link</label>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="cap-url" className="text-sm font-semibold">
+              Link
+            </label>
             <input
+              id="cap-url"
               type="url"
               inputMode="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://…"
-              className="rounded-lg border border-line bg-transparent px-3 py-2"
+              placeholder="Paste an article or guideline URL"
+              className="field"
             />
+          </div>
 
-            <label className="mt-2 text-sm font-medium">Notes</label>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="cap-text" className="text-sm font-semibold">
+              Notes
+            </label>
             <textarea
+              id="cap-text"
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder="Pearls from conference, the OR, rounds…"
-              rows={6}
-              className="rounded-lg border border-line bg-transparent px-3 py-2"
+              rows={5}
+              className="field"
             />
-            <p className="text-xs text-ink-2">
-              Study content only — leave out patient names, MRNs, and dates. Captures are sent to the Claude API for enhancement.
-            </p>
-          </section>
+          </div>
 
-          <button
-            type="button"
-            disabled={!hasInput || busy !== null}
-            onClick={enhance}
-            className="rounded-lg bg-accent px-4 py-3 font-medium text-white disabled:opacity-50 dark:text-black"
-          >
-            {busy === "enhance" ? "Building study note… (can take a minute)" : "Enhance with AI"}
-          </button>
-
-          <section className="card flex flex-col gap-3 p-4">
-            <h2 className="text-sm font-medium">Or save as-is</h2>
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="cap-title" className="text-sm font-semibold">
+              Title <span className="font-normal text-ink-2">(optional)</span>
+            </label>
             <input
+              id="cap-title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Title (defaults to the first line of your notes)"
-              className="rounded-lg border border-line bg-transparent px-3 py-2"
+              placeholder="Used when you save as-is"
+              className="field"
             />
-            <label className="text-sm text-ink-2">
-              Filed under
-              <TopicSelect value={topicId} onChange={setTopicId} />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="cap-topic" className="text-sm font-semibold">
+              File under
             </label>
+            <TopicSelect id="cap-topic" value={topicId} onChange={setTopicId} />
+            <p className="text-[0.8rem] text-ink-2">Leave it unfiled and the study note picks a topic for you.</p>
+          </div>
+
+          <p className="flex items-start gap-2.5 text-[0.8rem] leading-normal text-ink-2">
+            <LockIcon size={18} className="mt-px shrink-0" />
+            Study content only. Leave out patient names, MRNs and dates. Captures go to the Claude API to build the note.
+          </p>
+
+          {error && <p className="card border-shaky p-3 text-sm">{error}</p>}
+
+          <div className="flex flex-col gap-1">
+            <button type="button" disabled={!hasInput || busy !== null} onClick={enhance} className="btn btn-primary min-h-14">
+              {busy === "enhance" ? "Building study note… (up to a minute)" : "Build study note"}
+            </button>
+            <p className="pt-1.5 text-center text-[0.8rem] text-ink-2">You check the draft before it saves.</p>
             <button
               type="button"
               disabled={!hasInput || busy !== null}
               onClick={save}
-              className="rounded-lg border border-line px-4 py-3 font-medium disabled:opacity-50"
+              className="min-h-12 text-[0.95rem] font-medium underline underline-offset-4 disabled:opacity-50"
             >
-              {busy === "save" ? "Saving…" : "Save without AI"}
+              {busy === "save" ? "Saving…" : "Save as-is, enhance later"}
             </button>
-            <p className="text-xs text-ink-2">You can run the AI enhancement later from the note.</p>
-          </section>
+          </div>
         </>
       )}
 
-      {error && <p className="card border-red-400 p-3 text-sm">{error}</p>}
-
       {draft && (
         <>
-          <section className="card flex flex-col gap-2 p-4">
-            <h2 className="text-xl font-semibold">{draft.title}</h2>
-            <label className="text-sm text-ink-2">
-              Filed under
-              <TopicSelect value={topicId} onChange={setTopicId} />
-            </label>
+          <section className="flex flex-col gap-3">
+            <p className="eyebrow">Draft · not saved yet</p>
+            <h2 className="font-serif text-[2.1rem] leading-[1.12] font-medium tracking-tight">{draft.title}</h2>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="draft-topic" className="text-sm font-semibold">
+                File under
+              </label>
+              <TopicSelect id="draft-topic" value={topicId} onChange={setTopicId} />
+            </div>
           </section>
 
           <NoteView note={draft} />
 
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setDraft(null)}
-              disabled={busy !== null}
-              className="flex-1 rounded-lg border border-line px-4 py-3"
-            >
+          {error && <p className="card border-shaky p-3 text-sm">{error}</p>}
+
+          <div className="sticky bottom-[calc(4.75rem+env(safe-area-inset-bottom))] -mx-5 flex gap-3 border-t border-line bg-background px-5 py-3 md:bottom-0">
+            <button type="button" onClick={() => setDraft(null)} disabled={busy !== null} className="btn btn-outline flex-1">
               Back to edit
             </button>
-            <button
-              type="button"
-              onClick={save}
-              disabled={busy !== null}
-              className="flex-1 rounded-lg bg-accent px-4 py-3 font-medium text-white disabled:opacity-50 dark:text-black"
-            >
+            <button type="button" onClick={save} disabled={busy !== null} className="btn btn-primary flex-1">
               {busy === "save" ? "Saving…" : "Save note"}
             </button>
           </div>

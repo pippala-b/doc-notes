@@ -1,12 +1,16 @@
 "use client";
 
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ConfidenceDot, CONFIDENCE, dueLabel } from "@/components/Confidence";
+import { ChevronLeftIcon } from "@/components/icons";
 import NoteEditor, { type NoteEdits } from "@/components/NoteEditor";
 import NoteView from "@/components/NoteView";
 import PinnedImage from "@/components/PinnedImage";
 import RatingBar from "@/components/RatingBar";
 import { api } from "@/lib/api";
+import { nextIntervalDays } from "@/lib/review";
 import { categoryOf, findTopic } from "@/lib/topics";
 import type { NoteDetail, Pin } from "@/lib/types";
 
@@ -17,7 +21,7 @@ export default function NotePage() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [enhancing, setEnhancing] = useState(false);
-  const [nextReview, setNextReview] = useState<number | null>(null);
+  const [now] = useState(() => Date.now());
   const saveTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
 
   const load = useCallback(
@@ -27,12 +31,13 @@ export default function NotePage() {
         .catch((e) => setError(e.message)),
     [id],
   );
+
   useEffect(() => {
     load();
   }, [load]);
 
-  if (!note && error) return <p className="card p-4 text-sm">{error}</p>;
-  if (!note) return <p className="text-sm text-ink-2">Loading…</p>;
+  if (error && !note) return <p className="card mx-auto max-w-2xl p-4 text-sm">{error}</p>;
+  if (!note) return <p className="mx-auto max-w-2xl text-sm text-ink-2">Loading…</p>;
 
   function updatePins(imageId: string, pins: Pin[]) {
     setNote((n) => n && { ...n, images: n.images.map((im) => (im.id === imageId ? { ...im, pins } : im)) });
@@ -49,12 +54,20 @@ export default function NotePage() {
   }
 
   async function rate(confidence: 1 | 2 | 3) {
-    setNote((n) => n && { ...n, confidence, reviewedAt: new Date().toISOString() });
-    const r = await api<{ nextReviewInDays: number }>(`/api/notes/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify({ confidence }),
+    setNote((n) => {
+      if (!n) return n;
+      const intervalDays = nextIntervalDays(n.intervalDays, confidence);
+      return {
+        ...n,
+        confidence,
+        intervalDays,
+        reviewedAt: new Date().toISOString(),
+        dueAt: new Date(Date.now() + intervalDays * 86_400_000).toISOString(),
+      };
     });
-    setNextReview(r.nextReviewInDays);
+    await api(`/api/notes/${id}`, { method: "PATCH", body: JSON.stringify({ confidence }) }).catch((e) =>
+      setError(e.message),
+    );
   }
 
   async function saveEdits(edits: NoteEdits, topicId: string) {
@@ -87,44 +100,63 @@ export default function NotePage() {
   }
 
   const topic = findTopic(note.topicId);
+  const category = topic && categoryOf(topic.id);
 
   return (
-    <div className="flex flex-col gap-4">
-      <header>
-        <p className="text-sm text-ink-2">
-          {topic ? `${categoryOf(topic.id)?.name} › ${topic.name}` : "Unfiled"}
+    <div className="mx-auto flex max-w-2xl flex-col gap-8 pb-8 md:pb-28">
+      <header className="flex flex-col gap-3">
+        <div className="-mt-4 flex items-center justify-between md:-mt-2">
+          <Link href="/topics" className="-ml-2 flex min-h-11 items-center gap-0.5 px-1 text-[0.95rem] font-medium">
+            <ChevronLeftIcon size={20} strokeWidth={2} />
+            {category?.name ?? "Study tree"}
+          </Link>
+          <button
+            type="button"
+            aria-pressed={editing}
+            onClick={() => setEditing(!editing)}
+            className="min-h-11 rounded-full border border-line-strong px-4 text-sm font-medium"
+          >
+            {editing ? "Close editor" : "Edit"}
+          </button>
+        </div>
+        <p className="eyebrow font-normal tracking-[0.06em]">
+          {topic ? `${category?.name} › ${topic.name}` : "Unfiled"}
         </p>
-        <h1 className="text-2xl font-semibold">{note.title}</h1>
-        <p className="text-xs text-ink-2">
-          {new Date(note.createdAt).toLocaleString()}
+        <h1 className="font-serif text-[2.1rem] leading-[1.12] font-medium tracking-tight">{note.title}</h1>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-2 text-[0.8rem] text-ink-2">
+          <span>{new Date(note.createdAt).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}</span>
+          <span aria-hidden="true">·</span>
+          <span>from {note.sourceKind === "mixed" ? "mixed sources" : `a ${note.sourceKind}`}</span>
           {note.sourceUrl && (
             <>
-              {" · "}
-              <a href={note.sourceUrl} target="_blank" rel="noreferrer" className="text-accent underline">
+              <span aria-hidden="true">·</span>
+              <a href={note.sourceUrl} target="_blank" rel="noreferrer" className="font-medium text-accent">
                 source
               </a>
             </>
           )}
-        </p>
+          {note.confidence && (
+            <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-track px-2.5 py-1 font-medium text-ink">
+              <ConfidenceDot value={note.confidence} showLabel={false} />
+              {CONFIDENCE[note.confidence].label} · {dueLabel(note.dueAt, now)}
+            </span>
+          )}
+        </div>
       </header>
 
-      <div className="flex flex-wrap gap-2">
-        <button type="button" onClick={() => setEditing(!editing)} className="rounded-lg border border-line px-3 py-1.5 text-sm">
-          {editing ? "Close editor" : "Edit"}
-        </button>
-        {!note.aiEnhanced && (
-          <button
-            type="button"
-            onClick={enhance}
-            disabled={enhancing}
-            className="rounded-lg bg-accent px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50 dark:text-black"
-          >
-            {enhancing ? "Enhancing… (can take a minute)" : "Enhance with AI"}
+      {!note.aiEnhanced && (
+        <section className="card flex flex-col gap-3 p-5 sm:flex-row sm:items-center">
+          <div className="flex-1">
+            <h2 className="font-semibold">Saved as-is</h2>
+            <p className="text-sm text-ink-2">Build the study note to add high-yield points, pitfalls and a self-test.</p>
+          </div>
+          <button type="button" onClick={enhance} disabled={enhancing} className="btn btn-primary">
+            {enhancing ? "Building… (up to a minute)" : "Build study note"}
           </button>
-        )}
-      </div>
+        </section>
+      )}
 
-      {error && <p className="card border-red-400 p-3 text-sm">{error}</p>}
+      {error && <p className="card border-shaky p-3 text-sm">{error}</p>}
 
       {editing ? (
         <NoteEditor note={note.enhanced} topicId={note.topicId} onSave={saveEdits} onCancel={() => setEditing(false)} />
@@ -133,8 +165,8 @@ export default function NotePage() {
       )}
 
       {note.images.length > 0 && (
-        <section className="card flex flex-col gap-4 p-4">
-          <h2 className="text-sm font-semibold tracking-wide text-ink-2 uppercase">Source photos</h2>
+        <section className="flex flex-col gap-4">
+          <h2 className="eyebrow">Source photos</h2>
           {note.images.map((im) => (
             <PinnedImage
               key={im.id}
@@ -147,25 +179,26 @@ export default function NotePage() {
       )}
 
       {note.sourceText && (
-        <details className="card p-4 text-sm">
-          <summary className="cursor-pointer font-medium">Original notes</summary>
-          <pre className="mt-2 font-sans whitespace-pre-wrap text-ink-2">{note.sourceText}</pre>
+        <details className="group border-y border-line">
+          <summary className="flex min-h-13 cursor-pointer list-none items-center justify-between text-[0.95rem] font-medium [&::-webkit-details-marker]:hidden">
+            Original capture
+            <span className="text-ink-2 group-open:hidden">Show</span>
+            <span className="hidden text-ink-2 group-open:inline">Hide</span>
+          </summary>
+          <pre className="pb-4 font-sans text-sm leading-normal whitespace-pre-wrap text-ink-2">{note.sourceText}</pre>
         </details>
       )}
 
-      <section className="card p-4">
-        <h2 className="mb-2 text-sm font-semibold tracking-wide text-ink-2 uppercase">How well do you know this?</h2>
-        <RatingBar current={note.confidence} onRate={rate} />
-        {nextReview !== null && (
-          <p className="mt-2 text-xs text-ink-2">
-            Next review in {nextReview} day{nextReview === 1 ? "" : "s"}.
-          </p>
-        )}
-      </section>
-
-      <button type="button" onClick={remove} className="self-start text-sm text-ink-2 underline">
+      <button type="button" onClick={remove} className="min-h-11 self-start text-sm text-ink-2 underline underline-offset-4">
         Delete note
       </button>
+
+      <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-surface px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] md:left-58">
+        <div className="mx-auto flex max-w-2xl flex-col gap-2.5">
+          <div className="text-center text-sm font-medium">How well do you know this?</div>
+          <RatingBar current={note.confidence} intervalDays={note.intervalDays} onRate={rate} />
+        </div>
+      </div>
     </div>
   );
 }
